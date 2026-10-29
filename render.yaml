@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: task6-data
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: task6-data-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+
+databases:
+  - name: task6-data-db
+    databaseName: task6_data
+    user: task6_user

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL Faker — Fake Contact Generator</title>
+  <style>
+    :root {
+      --ink: #1b2430;
+      --muted: #5c6775;
+      --line: #d8dee6;
+      --bg: #f4f6f8;
+      --accent: #173e68;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 1280px;
+      margin: 35px auto;
+      padding: 0 18px 48px;
+      color: var(--ink);
+    }
+
+    p { color: var(--muted); line-height: 1.5; }
+
+    form.controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: end;
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input, select, button {
+      font: inherit;
+      padding: 9px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    button.secondary { background: #3d5a80; border-color: #3d5a80; }
+
+    .table-wrap { overflow-x: auto; margin-top: 24px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th { background: var(--bg); }
+    .error { color: #b42318; }
+    .navigation { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .note { font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>SQL Faker</h1>
+  <p>
+    Generate reproducible fake contact information. Records are synthetic test data, not real people.<br>
+    Generation runs entirely in PostgreSQL. The same locale, seed, and
+    index always produce the same person.
+  </p>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form class="controls" method="post">
+    <label>
+      Locale
+      <select name="locale">
+        {% for code, label in locales.items() %}
+          <option value="{{ code }}"
+            {% if locale == code %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Seed
+      <input name="seed" maxlength="200"
+             value="{{ seed }}" required>
+    </label>
+
+    <label>
+      Batch size
+      <select name="batch_size">
+        {% for n in [10, 25, 50, 100] %}
+          <option value="{{ n }}"
+            {% if batch_size == n %}selected{% endif %}>
+            {{ n }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <input type="hidden" name="batch_index" value="0">
+    <button type="submit">Generate / Restart</button>
+  </form>
+
+  {% if users %}
+    <h2>Generated users</h2>
+    <p>Batch {{ batch_index + 1 }} · {{ users|length }} records</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Full name</th>
+            <th>Address</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Height (cm)</th>
+            <th>Weight (kg)</th>
+            <th>Eye color</th>
+            <th>Hair color</th>
+            <th>Phone</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.user_index }}</td>
+              <td>{{ user.full_name }}</td>
+              <td>{{ user.address }}</td>
+              <td>{{ "%.5f"|format(user.latitude) }}</td>
+              <td>{{ "%.5f"|format(user.longitude) }}</td>
+              <td>{{ "%.1f"|format(user.height_cm) }}</td>
+              <td>{{ "%.1f"|format(user.weight_kg) }}</td>
+              <td>{{ user.eye_color }}</td>
+              <td>{{ user.hair_color }}</td>
+              <td>{{ user.phone }}</td>
+              <td>{{ user.email }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="navigation">
+      {% if batch_index > 0 %}
+        <form method="post">
+          <input type="hidden" name="locale" value="{{ locale }}">
+          <input type="hidden" name="seed" value="{{ seed }}">
+          <input type="hidden" name="batch_size" value="{{ batch_size }}">
+          <input type="hidden" name="batch_index"
+                 value="{{ batch_index - 1 }}">
+          <button class="secondary" type="submit">← Previous batch</button>
+        </form>
+      {% endif %}
+
+      <form method="post">
+        <input type="hidden" name="locale" value="{{ locale }}">
+        <input type="hidden" name="seed" value="{{ seed }}">
+        <input type="hidden" name="batch_size" value="{{ batch_size }}">
+        <input type="hidden" name="batch_index"
+               value="{{ batch_index + 1 }}">
+        <button type="submit">Next batch →</button>
+      </form>
+    </div>
+  {% endif %}
+</body>
+</html>
