@@ -26,55 +26,6 @@ Browser  →  Flask (app.py)  →  PostgreSQL procedure faker.generate_users_cur
 Adding a country means inserting a locale row and lookup values. There are no
 per-language tables such as `english_names`.
 
-## Installation
-
-Requires PostgreSQL 14+ and Python 3.11+.
-
-If you already have PostgreSQL 18 installed as a Windows service, create
-`task6_data` in pgAdmin instead and put your real password in `DATABASE_URL`.
-Do not commit that password.
-
-1. Create a database, for example `task6_data`.
-2. Set `DATABASE_URL`, then load the library:
-
-```powershell
-$env:DATABASE_URL = "postgresql://postgres:YOUR_PASSWORD@localhost:5432/task6_data"
-python -m pip install -r requirements.txt
-python scripts/generate_lookup_data.py
-python scripts/load_sql.py
-```
-
-SQL files are applied in this order:
-
-| File | Purpose |
-| --- | --- |
-| `sql/001_schema.sql` | Schema, locales, lookup tables, indexes |
-| `sql/002_lookup_data.sql` | Names, titles, addresses, regions, colors |
-| `sql/003_random_functions.sql` | Deterministic RNG, normal, sphere |
-| `sql/004_pickers.sql` | Locale-aware table selection |
-| `sql/005_formatters.sql` | Name, address, phone, email strings |
-| `sql/006_generators.sql` | Batch generator and stored procedure |
-| `sql/007_tests.sql` | Correctness checks |
-
-From `psql`:
-
-```text
-\i sql/001_schema.sql
-\i sql/002_lookup_data.sql
-\i sql/003_random_functions.sql
-\i sql/004_pickers.sql
-\i sql/005_formatters.sql
-\i sql/006_generators.sql
-```
-
-Run the web app:
-
-```powershell
-flask --app app run --debug
-```
-
-Open `http://127.0.0.1:5000`.
-
 ## How to use the library
 
 ### Main stored procedure (what the app calls)
@@ -262,10 +213,6 @@ A field of a person is a pure function of:
 Identical arguments on the same dictionary version return identical rows,
 including after restarting Flask or PostgreSQL.
 
-If you insert, delete, or reorder lookup values, the same offset can point at
-a different name. Record `faker.meta.dictionary_version` with any release.
-This dataset is `2026.10.1`.
-
 ## Lookup tables and provenance
 
 Shared tables, distinguished by `locale_code`:
@@ -285,86 +232,7 @@ Sources:
 
 - Common public given names and surnames (census-style frequency lists).
 - Extra combinatorial syllable names so the pool is large enough for
-  100,000–1,000,000 generated users without a 10-surname dictionary.
+  100,000–1,000,000 generated users.
 - Public city and region names.
 
 No real personal emails, phones, or street-level private addresses are stored.
-
-Approximate dictionary sizes after generation (see script output): several
-hundred first names and 700+ last names per locale, 100+ cities, 150+ street
-words. First × last combinations already exceed one million per locale, before
-middle names, titles, and address variants.
-
-## Tests
-
-```sql
--- in psql, after install
-\i sql/007_tests.sql
-```
-
-Expected:
-
-1. `row_count = 10`
-2. empty result (two identical batches)
-3. `valid_latitudes` and `valid_longitudes` are true
-4. indices 10 through 19
-5. height/weight bounds true
-6. dictionary version `2026.10.1`
-
-## Benchmark
-
-Measures procedure throughput through the same Python helper the web app uses
-(HTML rendering is not included).
-
-```powershell
-python benchmark.py --users 10000 --batch-size 100
-```
-
-Record database plan, region, Python version, and whether the client is local
-or remote. Warm up once; the script does a 10-row warmup by default.
-
-Fill this table after you run it (do not invent numbers):
-
-| Users | Batch size | Locale | Elapsed s | Users/s | Notes |
-| --- | --- | --- | --- | --- | --- |
-| 10_000 | 100 | en_US |  |  |  |
-| 10_000 | 500 | en_US |  |  |  |
-| 100_000 | 500 | en_US |  |  | optional |
-
-## Extending the library
-
-1. Insert into `faker.locales`.
-2. Add names, titles, address parts, regions, and colors for that locale.
-3. Assign dense `seq` values starting at 0 within each `(locale, type)` group.
-4. Teach formatters any new postal or phone layout.
-5. Bump `dictionary_version` in `faker.meta`.
-
-New numeric attributes should call `faker.u01` / `faker.normal` with a **new**
-field id so existing fields stay stable.
-
-To wipe a previous install: run `sql/000_reset.sql`, then `python scripts/load_sql.py` again.
-
-## Deployment (Render)
-
-1. Push this repository (no `.env`, no passwords).
-2. Create a Render PostgreSQL instance and a Python web service, or apply
-   `render.yaml`.
-3. Set `DATABASE_URL` from the database connection string (internal URL if
-   the web service and database share a region).
-4. **Manually run** `python scripts/load_sql.py` against that database.
-   Render does not execute the SQL folder by itself.
-5. Start command: `gunicorn --bind 0.0.0.0:$PORT app:app`
-
-## Project layout
-
-```text
-app.py                 Flask routes
-db.py                  CALL faker.generate_users_cursor
-benchmark.py           users/second measurement
-requirements.txt
-render.yaml
-sql/                   schema + library
-scripts/generate_lookup_data.py
-scripts/load_sql.py
-templates/index.html
-```
